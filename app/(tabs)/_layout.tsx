@@ -1,33 +1,51 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Platform } from 'react-native';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
+        headerShown: false, // We hide the default header (we made a custom one in index.tsx)
+        tabBarStyle: Platform.select({
+          ios: { position: 'absolute' }, // Glass effect on iOS
+          default: {},
+        }),
+        tabBarActiveTintColor: '#4A90E2',
+        tabBarInactiveTintColor: '#999',
       }}>
+
+      {/* Tab 1: Inventory (Home) */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Pantry',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="kitchen" size={28} color={color} />
+          ),
         }}
       />
+
+      {/* Tab 2: Camera (New) */}
       <Tabs.Screen
-        name="explore"
+        name="camera"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Scan',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="camera-alt" size={28} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 3: Recipes (New) */}
+      <Tabs.Screen
+        name="recipes"
+        options={{
+          title: 'Chef',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="chef-hat" size={28} color={color} />
+          ),
         }}
       />
     </Tabs>

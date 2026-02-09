@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  SafeAreaView
 } from 'react-native';
 import {
   collection,
@@ -41,11 +40,11 @@ interface InventoryItem {
 
 // --- Constants ---
 const CATEGORIES = ['Pantry', 'FruitVeg', 'Freezer', 'Refrigerator'];
-const UNITS = ['units', 'kg', 'g', 'L']; // <--- New Units List
+const UNITS = ['units', 'kg', 'g', 'L'];
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export default function Index() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth(); // <--- Get signOut
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -59,14 +58,23 @@ export default function Index() {
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('Pantry');
   const [formQuantity, setFormQuantity] = useState('1');
-  const [formUnit, setFormUnit] = useState('units'); // <--- New Unit State
+  const [formUnit, setFormUnit] = useState('units');
 
   // Date State
   const [formDate, setFormDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // --- Helpers ---
+  // --- Logout Logic ---
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Logout failed", error);
+      Alert.alert("Error", "Failed to log out");
+    }
+  };
 
+  // --- Helpers (Status & Sort) ---
   const getItemStatus = (date?: Timestamp | null) => {
     if (!date) return 'fresh';
     const now = new Date();
@@ -92,12 +100,9 @@ export default function Index() {
   };
 
   // --- Firestore Logic ---
-
   useEffect(() => {
     if (!user) return;
-
     const q = collection(db, `users/${user.uid}/inventory`);
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedItems: InventoryItem[] = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -109,8 +114,7 @@ export default function Index() {
     return () => unsubscribe();
   }, [user]);
 
-  // --- Handlers ---
-
+  // --- Handlers (Save, Edit, Delete) ---
   const handleSaveItem = async () => {
     if (!formName.trim()) {
       Alert.alert('Validation', 'Please enter a name');
@@ -124,8 +128,8 @@ export default function Index() {
     const payload = {
       name: formName,
       category: formCategory,
-      quantity: parseFloat(formQuantity) || 1, // Changed to parseFloat to allow 0.5 kg
-      unit: formUnit, // <--- Saving the selected unit
+      quantity: parseFloat(formQuantity) || 1,
+      unit: formUnit,
       expiration_date: formDate ? Timestamp.fromDate(formDate) : null,
     };
 
@@ -151,7 +155,7 @@ export default function Index() {
     setFormName('');
     setFormCategory('Pantry');
     setFormQuantity('1');
-    setFormUnit('units'); // Default
+    setFormUnit('units');
     setFormDate(null);
     setModalVisible(true);
   };
@@ -162,7 +166,7 @@ export default function Index() {
     setFormName(item.name);
     setFormCategory(item.category);
     setFormQuantity(item.quantity.toString());
-    setFormUnit(item.unit || 'units'); // Load saved unit
+    setFormUnit(item.unit || 'units');
     setFormDate(item.expiration_date ? item.expiration_date.toDate() : null);
     setModalVisible(true);
   };
@@ -191,7 +195,6 @@ export default function Index() {
   };
 
   // --- Render Components ---
-
   const renderItem = ({ item }: { item: InventoryItem }) => {
     const status = getItemStatus(item.expiration_date);
     let cardStyle = styles.card;
@@ -210,7 +213,6 @@ export default function Index() {
         <View style={styles.cardContent}>
           <View style={{ flex: 1 }}>
             <Text style={styles.itemName}>{item.name}</Text>
-            {/* Display Quantity AND Unit */}
             <Text style={styles.itemMeta}>
               {item.quantity} {item.unit} • {item.category}
             </Text>
@@ -249,8 +251,18 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      {/* --- Filter Header (Safe Area Wrapper) --- */}
-      {/* Added extra padding on top for iOS notch */}
+      {/* --- NEW HEADER ROW --- */}
+      <View style={styles.topBar}>
+        <Text style={styles.appTitle}>PantryChef</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <MaterialIcons name="logout" size={24} color="#FF3B30" />
+          {/* Optional: Add text for web clarity */}
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+      {/* ---------------------- */}
+
+      {/* --- Filter Header --- */}
       <View style={styles.headerContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.headerScroll}>
           <TouchableOpacity
@@ -285,7 +297,7 @@ export default function Index() {
         <AntDesign name="plus" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* --- Add/Edit Modal --- */}
+      {/* --- Add/Edit Modal (Same as before) --- */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -302,7 +314,6 @@ export default function Index() {
               onChangeText={setFormName}
             />
 
-            {/* Quantity Row */}
             <Text style={styles.label}>Quantity & Unit</Text>
             <View style={styles.quantityRow}>
                 <TextInput
@@ -397,19 +408,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // --- Header Fix for Notch ---
-  headerContainer: {
+  // --- New Top Bar Styles ---
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+  },
+  appTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutText: {
+    marginLeft: 5,
+    color: '#FF3B30',
+    fontWeight: '600',
+  },
+  // -------------------------
+  headerContainer: {
+    backgroundColor: '#fff',
     paddingVertical: 10,
-    // Add top padding specifically for iOS to clear the notch
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   headerScroll: {
     paddingHorizontal: 15,
   },
-  // ---------------------------
   listContent: {
     padding: 15,
     paddingBottom: 100,
@@ -545,7 +578,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     justifyContent: 'center',
   },
-  // New Styles for Quantity Row
   quantityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -575,7 +607,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  // --------------------------
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
