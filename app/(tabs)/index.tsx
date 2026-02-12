@@ -53,6 +53,8 @@ export default function Index() {
   const [modalVisible, setModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [usageModalVisible, setUsageModalVisible] = useState(false);
+  const [usageItems, setUsageItems] = useState<{ [key: string]: number }>({});
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -185,6 +187,86 @@ export default function Index() {
     setShowDatePicker(false);
   };
 
+  const openUsageModal = () => {
+    setUsageModalVisible(true);
+    // Initialize usage items with 0 for all items
+    const initialUsage: { [key: string]: number } = {};
+    items.forEach(item => {
+      initialUsage[item.id] = 0;
+    });
+    setUsageItems(initialUsage);
+  };
+
+  const handleUsageChange = (itemId: string, value: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const numValue = parseFloat(value) || 0;
+    // Don't allow usage to exceed available quantity
+    const finalValue = Math.min(Math.max(0, numValue), item.quantity);
+
+    setUsageItems(prev => ({
+      ...prev,
+      [itemId]: finalValue
+    }));
+  };
+
+  const incrementUsage = (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const currentValue = usageItems[itemId] || 0;
+    const newValue = Math.min(currentValue + 1, item.quantity);
+
+    setUsageItems(prev => ({
+      ...prev,
+      [itemId]: newValue
+    }));
+  };
+
+  const decrementUsage = (itemId: string) => {
+    const currentValue = usageItems[itemId] || 0;
+    const newValue = Math.max(currentValue - 1, 0);
+
+    setUsageItems(prev => ({
+      ...prev,
+      [itemId]: newValue
+    }));
+  };
+
+  const handleSaveUsage = async () => {
+    if (!user) return;
+
+    try {
+      // Update all items with usage
+      const updatePromises = Object.entries(usageItems)
+        .filter(([_, amount]) => amount > 0)
+        .map(async ([itemId, usedAmount]) => {
+          const item = items.find(i => i.id === itemId);
+          if (!item) return;
+
+          const newQuantity = item.quantity - usedAmount;
+
+          if (newQuantity <= 0) {
+            // Delete item if quantity is 0 or negative
+            await deleteDoc(doc(db, `users/${user.uid}/inventory`, itemId));
+          } else {
+            // Update with new quantity
+            await updateDoc(doc(db, `users/${user.uid}/inventory`, itemId), {
+              quantity: newQuantity
+            });
+          }
+        });
+
+      await Promise.all(updatePromises);
+      setUsageModalVisible(false);
+      Alert.alert('Success', 'Inventory updated!');
+    } catch (error) {
+      console.error('Error updating usage:', error);
+      Alert.alert('Error', 'Could not update inventory.');
+    }
+  };
+
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
@@ -254,11 +336,16 @@ export default function Index() {
       {/* --- NEW HEADER ROW --- */}
       <View style={styles.topBar}>
         <Text style={styles.appTitle}>PantryChef</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <MaterialIcons name="logout" size={24} color="#FF3B30" />
-          {/* Optional: Add text for web clarity */}
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={styles.topBarActions}>
+          <TouchableOpacity onPress={openUsageModal} style={styles.usageButton}>
+            <MaterialIcons name="remove-circle-outline" size={24} color="#4A90E2" />
+            <Text style={styles.usageText}>I Used</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <MaterialIcons name="logout" size={24} color="#FF3B30" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {/* ---------------------- */}
 
@@ -352,35 +439,62 @@ export default function Index() {
             </View>
 
             <Text style={styles.label}>Expiration Date</Text>
-            <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowDatePicker((prev) => !prev)}
-            >
-                <Text style={{ color: formDate ? '#000' : '#aaa', fontSize: 16 }}>
+            {Platform.OS === 'web' ? (
+              // Web: Use native HTML5 date input (has built-in calendar icon)
+              <View style={styles.input}>
+                <input
+                  type="date"
+                  value={formDate ? formDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setFormDate(new Date(e.target.value));
+                    }
+                  }}
+                  placeholder="Select Date (Optional)"
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
+                    fontSize: 16,
+                    width: '100%',
+                    color: formDate ? '#000' : '#aaa',
+                  }}
+                />
+              </View>
+            ) : (
+              // Mobile: Use DateTimePicker
+              <>
+                <TouchableOpacity
+                  style={styles.input}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: formDate ? '#000' : '#aaa', fontSize: 16 }}>
                     {formDate ? formDate.toLocaleDateString() : 'Select Date (Optional)'}
-                </Text>
-                <AntDesign name="calendar" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 12 }}/>
-            </TouchableOpacity>
+                  </Text>
+                  <AntDesign name="calendar" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 12 }}/>
+                </TouchableOpacity>
 
-            {showDatePicker && (
-                <View style={styles.datePickerContainer}>
+                {showDatePicker && (
+                  <View style={styles.datePickerContainer}>
                     <DateTimePicker
-                        value={formDate || new Date()}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={onDateChange}
-                        themeVariant="light"
-                        textColor="black"
+                      value={formDate || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onDateChange}
+                      themeVariant="light"
+                      textColor="black"
                     />
                     {Platform.OS === 'ios' && (
-                        <TouchableOpacity
-                            style={styles.iosDatePickerButton}
-                            onPress={() => setShowDatePicker(false)}
-                        >
-                            <Text style={styles.iosDatePickerButtonText}>Done</Text>
-                        </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iosDatePickerButton}
+                        onPress={() => setShowDatePicker(false)}
+                      >
+                        <Text style={styles.iosDatePickerButtonText}>Done</Text>
+                      </TouchableOpacity>
                     )}
-                </View>
+                  </View>
+                )}
+              </>
             )}
 
             <View style={styles.modalButtons}>
@@ -393,6 +507,68 @@ export default function Index() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* --- Usage Modal --- */}
+      <Modal animationType="slide" transparent={true} visible={usageModalVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Track Usage</Text>
+            <Text style={styles.usageSubtitle}>How much did you use?</Text>
+
+            <ScrollView style={styles.usageList}>
+              {items.map((item) => (
+                <View key={item.id} style={styles.usageItem}>
+                  <View style={styles.usageItemInfo}>
+                    <Text style={styles.usageItemName}>{item.name}</Text>
+                    <Text style={styles.usageItemMeta}>
+                      Available: {item.quantity} {item.unit}
+                    </Text>
+                  </View>
+                  <View style={styles.usageControls}>
+                    <TouchableOpacity
+                      onPress={() => decrementUsage(item.id)}
+                      style={styles.usageButton}
+                      disabled={(usageItems[item.id] || 0) <= 0}
+                    >
+                      <MaterialIcons name="remove" size={20} color={(usageItems[item.id] || 0) <= 0 ? '#ccc' : '#4A90E2'} />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={styles.usageInput}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      value={usageItems[item.id]?.toString() || ''}
+                      onChangeText={(value) => handleUsageChange(item.id, value)}
+                    />
+                    <Text style={styles.usageUnit}>{item.unit}</Text>
+                    <TouchableOpacity
+                      onPress={() => incrementUsage(item.id)}
+                      style={styles.usageButton}
+                      disabled={(usageItems[item.id] || 0) >= item.quantity}
+                    >
+                      <MaterialIcons name="add" size={20} color={(usageItems[item.id] || 0) >= item.quantity ? '#ccc' : '#4A90E2'} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => setUsageModalVisible(false)}
+                style={[styles.btn, styles.btnCancel]}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveUsage}
+                style={[styles.btn, styles.btnSave]}
+              >
+                <Text style={[styles.btnText, { color: '#fff' }]}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -423,6 +599,24 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  usageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  usageText: {
+    marginLeft: 5,
+    color: '#4A90E2',
+    fontWeight: '600',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -670,5 +864,61 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontWeight: 'bold',
     fontSize: 16,
-  }
+  },
+  usageSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  usageList: {
+    maxHeight: 400,
+  },
+  usageItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  usageItemInfo: {
+    flex: 1,
+  },
+  usageItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  usageItemMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  usageControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+  },
+  usageButton: {
+    padding: 8,
+  },
+  usageInput: {
+    width: 50,
+    padding: 8,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  usageUnit: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 5,
+    marginRight: 5,
+  },
 });

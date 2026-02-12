@@ -1,5 +1,5 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -25,7 +25,7 @@ import { db } from '../../firebaseConfig';
 import { useAuth } from '../context/AuthContext';
 
 // --- CONFIGURATION ---
-const API_KEY = "AIzaSyAAmDr6-ZU8KVdYFJCuJA6sHXQ9w3dJGbY";
+const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 interface ScannedItem {
@@ -60,8 +60,10 @@ export default function CameraScreen() {
   const [showGlobalDatePicker, setShowGlobalDatePicker] = useState(false);
   const [activeDateId, setActiveDateId] = useState<string | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
+  const dropZoneRef = useRef<View>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,9 +78,53 @@ export default function CameraScreen() {
         setShowGlobalDatePicker(false);
         setEditingNameId(null);
         setActiveDateId(null);
+        setIsDragging(false);
       };
     }, [])
   );
+
+  // Attach drag-and-drop listeners for web
+  useEffect(() => {
+    if (Platform.OS === 'web' && dropZoneRef.current) {
+      const dropZone = dropZoneRef.current as any;
+
+      const handleDragEnter = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      };
+
+      const handleDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+      };
+
+      const handleDragOverEvent = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      const handleDropEvent = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        handleDrop(e);
+      };
+
+      dropZone.addEventListener('dragenter', handleDragEnter);
+      dropZone.addEventListener('dragleave', handleDragLeave);
+      dropZone.addEventListener('dragover', handleDragOverEvent);
+      dropZone.addEventListener('drop', handleDropEvent);
+
+      return () => {
+        dropZone.removeEventListener('dragenter', handleDragEnter);
+        dropZone.removeEventListener('dragleave', handleDragLeave);
+        dropZone.removeEventListener('dragover', handleDragOverEvent);
+        dropZone.removeEventListener('drop', handleDropEvent);
+      };
+    }
+  }, []);
 
   const ensureBase64 = async (uri: string, existingBase64: string | null) => {
     if (existingBase64) return existingBase64;
@@ -116,7 +162,7 @@ export default function CameraScreen() {
     setStatus("Opening gallery...");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.5,
       base64: true,
     });
@@ -129,6 +175,35 @@ export default function CameraScreen() {
     } else {
       setStatus("");
     }
+  };
+
+  const handleDrop = async (event: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setStatus("Processing dropped image...");
+
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          setCapturedImage(result);
+          setBase64Data(result.split(',')[1]);
+          setStatus("✅ Image loaded! Ready to Identify.");
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setStatus("❌ Please drop an image file");
+        setTimeout(() => setStatus(""), 2000);
+      }
+    }
+  };
+
+  const handleDragOver = (event: any) => {
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const takePicture = async () => {
@@ -356,6 +431,17 @@ export default function CameraScreen() {
               <Text style={styles.optionTitle}>Upload File</Text>
             </TouchableOpacity>
           </View>
+          {Platform.OS === 'web' && (
+            <View
+              ref={dropZoneRef}
+              style={[styles.dropZone, isDragging && styles.dropZoneActive]}
+            >
+              <Ionicons name="cloud-upload-outline" size={50} color="#4A90E2" />
+              <Text style={styles.dropZoneText}>
+                {isDragging ? '📥 Drop image here!' : 'Or drag and drop an image here'}
+              </Text>
+            </View>
+          )}
         </>
       )}
 
@@ -532,7 +618,7 @@ const styles = StyleSheet.create({
   cameraBottomBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 30 },
   shutterBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' },
   shutterInner: { width: 55, height: 55, borderRadius: 27.5, backgroundColor: '#fff' },
-  previewImage: { flex: 1, width: '100%', height: '100%' },
+  previewImage: { flex: 1, width: '100%', height: '100%', resizeMode: 'contain' },
 
   statusOverlay: { position: 'absolute', top: 50, left: 0, right: 0, alignItems: 'center', zIndex: 5 },
   statusText: { backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', padding: 10, borderRadius: 20, overflow: 'hidden', fontWeight: 'bold' },
@@ -632,5 +718,30 @@ const styles = StyleSheet.create({
 
   modalFooter: { padding: 20, borderTopWidth: 1, borderColor: '#eee', backgroundColor: '#fff' },
   saveAllBtn: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 12, alignItems: 'center' },
-  saveAllText: { color: '#fff', fontWeight: 'bold', fontSize: 18 }
+  saveAllText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
+
+  dropZone: {
+    marginTop: 40,
+    padding: 40,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#4A90E2',
+    borderRadius: 20,
+    backgroundColor: '#F5F9FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '80%',
+    maxWidth: 400,
+  },
+  dropZoneActive: {
+    backgroundColor: '#D6E9FF',
+    borderColor: '#2196F3',
+    borderWidth: 3,
+  },
+  dropZoneText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#4A90E2',
+    fontWeight: '600',
+  }
 });
