@@ -240,7 +240,12 @@ export default function CameraScreen() {
       if (!finalBase64) throw new Error("Could not process image data.");
 
       setStatus("📡 Sending to Gemini AI...");
-      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+      const model = genAI.getGenerativeModel({
+        model: "gemini-flash-latest",
+        generationConfig: {
+          temperature: 0.4,
+        }
+      });
 
       const prompt = `
         Analyze this food image. Identify ALL food items visible.

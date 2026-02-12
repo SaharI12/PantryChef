@@ -188,7 +188,12 @@ ${conversationHistory}
 
 Now respond to the user's latest message naturally and helpfully.`;
 
-      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+      const model = genAI.getGenerativeModel({
+        model: "gemini-flash-latest",
+        generationConfig: {
+          temperature: 0.7,
+        }
+      });
       const result = await model.generateContent(systemPrompt);
       const response = result.response.text();
 
