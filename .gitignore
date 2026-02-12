@@ -42,3 +42,6 @@ app-example
 /ios
 /android
 .env
+
+# session notes (not for version control)
+NEXT_SESSION_PROMPT.txt
