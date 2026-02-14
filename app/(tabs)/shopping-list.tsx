@@ -96,6 +96,8 @@ export default function ShoppingList() {
 
   // --- Handlers ---
   const handleSaveItem = async () => {
+    console.log('Save button clicked!');
+
     if (!formName.trim()) {
       Alert.alert('Validation', 'Please enter an item name');
       return;
@@ -112,19 +114,25 @@ export default function ShoppingList() {
       checked: false,
     };
 
+    console.log('Saving payload:', payload);
+
     try {
       if (isEditing && editingId) {
+        console.log('Updating item:', editingId);
         await updateDoc(doc(db, `users/${user.uid}/shopping_list`, editingId), payload);
       } else {
-        await addDoc(collection(db, `users/${user.uid}/shopping_list`), {
+        console.log('Adding new item to shopping list');
+        const docRef = await addDoc(collection(db, `users/${user.uid}/shopping_list`), {
           ...payload,
           created_at: Timestamp.now(),
         });
+        console.log('Item added with ID:', docRef.id);
       }
+      Alert.alert('Success', 'Item saved!');
       closeModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving:', error);
-      Alert.alert('Error', 'Could not save item.');
+      Alert.alert('Error', `Could not save item: ${error.message}`);
     }
   };
 
@@ -329,9 +337,11 @@ export default function ShoppingList() {
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={openAddModal}>
-        <AntDesign name="plus" size={28} color="#fff" />
-      </TouchableOpacity>
+      {!modalVisible && (
+        <TouchableOpacity style={styles.fab} onPress={openAddModal}>
+          <AntDesign name="plus" size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       {/* Add/Edit Modal */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
@@ -340,46 +350,48 @@ export default function ShoppingList() {
           style={styles.modalOverlay}
         >
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? 'Edit Item' : 'Add Item'}
-            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>
+                {isEditing ? 'Edit Item' : 'Add Item'}
+              </Text>
 
-            <Text style={styles.label}>Item Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Milk, Bread, Eggs"
-              value={formName}
-              onChangeText={setFormName}
-            />
-
-            <Text style={styles.label}>Quantity & Unit</Text>
-            <View style={styles.quantityRow}>
+              <Text style={styles.label}>Item Name</Text>
               <TextInput
-                style={[styles.input, { flex: 0.4, marginBottom: 0 }]}
-                placeholder="1"
-                keyboardType="numeric"
-                value={formQuantity}
-                onChangeText={setFormQuantity}
+                style={styles.input}
+                placeholder="e.g. Milk, Bread, Eggs"
+                value={formName}
+                onChangeText={setFormName}
               />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.unitSelector}
-                contentContainerStyle={styles.unitSelectorContent}
-              >
-                {UNITS.map((u) => (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.unitPill, formUnit === u && styles.unitPillActive]}
-                    onPress={() => setFormUnit(u)}
-                  >
-                    <Text style={[styles.unitText, formUnit === u && styles.unitTextActive]}>
-                      {u}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+
+              <Text style={styles.label}>Quantity & Unit</Text>
+              <View style={styles.quantityRow}>
+                <TextInput
+                  style={[styles.input, { flex: 0.4, marginBottom: 0 }]}
+                  placeholder="1"
+                  keyboardType="numeric"
+                  value={formQuantity}
+                  onChangeText={setFormQuantity}
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.unitSelector}
+                  contentContainerStyle={styles.unitSelectorContent}
+                >
+                  {UNITS.map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[styles.unitPill, formUnit === u && styles.unitPillActive]}
+                      onPress={() => setFormUnit(u)}
+                    >
+                      <Text style={[styles.unitText, formUnit === u && styles.unitTextActive]}>
+                        {u}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity onPress={closeModal} style={[styles.btn, styles.btnCancel]}>
