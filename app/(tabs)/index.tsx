@@ -21,6 +21,9 @@ import {
   deleteDoc,
   addDoc,
   Timestamp,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -117,6 +120,23 @@ export default function Index() {
     return () => unsubscribe();
   }, [user]);
 
+  // Function to remove item from shopping list if it exists
+  const removeFromShoppingList = async (itemName: string) => {
+    if (!user) return;
+    try {
+      const shoppingListRef = collection(db, `users/${user.uid}/shopping_list`);
+      const q = query(shoppingListRef, where('name', '==', itemName));
+      const querySnapshot = await getDocs(q);
+
+      const deletePromises = querySnapshot.docs.map(docSnap =>
+        deleteDoc(doc(db, `users/${user.uid}/shopping_list`, docSnap.id))
+      );
+      await Promise.all(deletePromises);
+    } catch (error) {
+      console.error('Error removing from shopping list:', error);
+    }
+  };
+
   // --- Handlers (Save, Edit, Delete) ---
   const handleSaveItem = async () => {
     if (!formName.trim()) {
@@ -144,6 +164,8 @@ export default function Index() {
           ...payload,
           created_at: Timestamp.now(),
         });
+        // Auto-remove from shopping list if item exists there
+        await removeFromShoppingList(formName);
       }
       closeModal();
     } catch (error) {
@@ -388,9 +410,8 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      {/* --- NEW HEADER ROW --- */}
+      {/* --- TOP ACTION BAR --- */}
       <View style={styles.topBar}>
-        <Text style={styles.appTitle}>House Inventory</Text>
         <View style={styles.topBarActions}>
           <TouchableOpacity onPress={openUsageModal} style={styles.usageButton}>
             <MaterialIcons name="remove-circle-outline" size={24} color="#4A90E2" />
@@ -656,18 +677,13 @@ const styles = StyleSheet.create({
   // --- New Top Bar Styles ---
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-  },
-  appTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
   },
   topBarActions: {
     flexDirection: 'row',

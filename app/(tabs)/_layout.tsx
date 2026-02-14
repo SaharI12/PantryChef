@@ -1,64 +1,80 @@
-import { Tabs } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
 import React from 'react';
-import { Platform } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
-export default function TabLayout() {
+export default function DrawerLayout() {
   return (
-    <Tabs
+    <Drawer
       screenOptions={{
-        headerShown: false, // We hide the default header (we made a custom one in index.tsx)
-        tabBarStyle: Platform.select({
-          ios: { position: 'absolute' }, // Glass effect on iOS
-          default: {},
-        }),
-        tabBarActiveTintColor: '#4A90E2',
-        tabBarInactiveTintColor: '#999',
+        drawerActiveTintColor: '#4A90E2',
+        drawerInactiveTintColor: '#666',
+        drawerStyle: {
+          backgroundColor: '#fff',
+          width: 240,
+        },
+        drawerLabelStyle: {
+          fontSize: 16,
+          fontWeight: '600',
+        },
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: '#4A90E2',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
       }}>
 
-      {/* Tab 1: Inventory (Home) */}
-      <Tabs.Screen
+      {/* Screen 1: Inventory (Home) */}
+      <Drawer.Screen
         name="index"
         options={{
-          title: 'House',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="home" size={28} color={color} />
+          title: 'House Inventory',
+          drawerLabel: 'House',
+          drawerIcon: ({ color, size }) => (
+            <MaterialIcons name="home" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Tab 2: Camera */}
-      <Tabs.Screen
+      {/* Screen 2: Camera */}
+      <Drawer.Screen
         name="camera"
         options={{
-          title: 'Scan',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="camera-alt" size={28} color={color} />
+          title: 'Scan Items',
+          drawerLabel: 'Scan',
+          drawerIcon: ({ color, size }) => (
+            <MaterialIcons name="camera-alt" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Tab 3: Recipes */}
-      <Tabs.Screen
+      {/* Screen 3: Recipes */}
+      <Drawer.Screen
         name="recipes"
         options={{
-          title: 'Chef',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="chef-hat" size={28} color={color} />
+          title: 'AI Chef',
+          drawerLabel: 'Chef',
+          drawerIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="chef-hat" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Tab 4: Shopping List */}
-      <Tabs.Screen
+      {/* Screen 4: Shopping List */}
+      <Drawer.Screen
         name="shopping-list"
         options={{
-          title: 'Shopping',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="shopping-cart" size={28} color={color} />
+          title: 'Shopping List',
+          drawerLabel: 'Shopping',
+          drawerIcon: ({ color, size }) => (
+            <MaterialIcons name="shopping-cart" size={size} color={color} />
           ),
         }}
       />
-    </Tabs>
+    </Drawer>
   );
 }

@@ -11,6 +11,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import {
   collection,
@@ -185,6 +186,53 @@ export default function ShoppingList() {
     setModalVisible(false);
   };
 
+  const addCheckedItemsToInventory = async () => {
+    if (!user) return;
+    const checkedItems = items.filter(item => item.checked);
+    if (checkedItems.length === 0) {
+      Alert.alert('Info', 'No checked items to add to inventory');
+      return;
+    }
+
+    Alert.alert(
+      'Add to Inventory',
+      `Add ${checkedItems.length} checked item(s) to your house inventory?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: async () => {
+            try {
+              const inventoryRef = collection(db, `users/${user.uid}/inventory`);
+              const addPromises = checkedItems.map(item =>
+                addDoc(inventoryRef, {
+                  name: item.name,
+                  category: 'Pantry', // Default category
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  expiration_date: null,
+                  created_at: Timestamp.now(),
+                })
+              );
+              await Promise.all(addPromises);
+
+              // Remove from shopping list
+              const deletePromises = checkedItems.map(item =>
+                deleteDoc(doc(db, `users/${user.uid}/shopping_list`, item.id))
+              );
+              await Promise.all(deletePromises);
+
+              Alert.alert('Success', 'Items added to inventory!');
+            } catch (error) {
+              console.error('Error adding to inventory:', error);
+              Alert.alert('Error', 'Could not add items to inventory');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // --- Render Components ---
   const renderItem = ({ item }: { item: ShoppingItem }) => {
     return (
@@ -235,13 +283,20 @@ export default function ShoppingList() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Shopping List</Text>
-        {checkedCount > 0 && (
-          <TouchableOpacity onPress={clearCheckedItems} style={styles.clearButton}>
-            <MaterialIcons name="delete-sweep" size={24} color="#FF6B6B" />
-            <Text style={styles.clearText}>Clear ({checkedCount})</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerLeft}>
+          {checkedCount > 0 && (
+            <>
+              <TouchableOpacity onPress={addCheckedItemsToInventory} style={styles.addButton}>
+                <MaterialIcons name="add-shopping-cart" size={22} color="#4A90E2" />
+                <Text style={styles.addText}>Add to House</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={clearCheckedItems} style={styles.clearButton}>
+                <MaterialIcons name="delete-sweep" size={22} color="#FF6B6B" />
+                <Text style={styles.clearText}>Remove</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -290,7 +345,12 @@ export default function ShoppingList() {
                 value={formQuantity}
                 onChangeText={setFormQuantity}
               />
-              <View style={styles.unitSelector}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.unitSelector}
+                contentContainerStyle={styles.unitSelectorContent}
+              >
                 {UNITS.map((u) => (
                   <TouchableOpacity
                     key={u}
@@ -302,7 +362,7 @@ export default function ShoppingList() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             </View>
 
             <View style={styles.modalButtons}>
@@ -331,19 +391,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addText: {
+    marginLeft: 5,
+    color: '#4A90E2',
+    fontWeight: '600',
+    fontSize: 14,
   },
   clearButton: {
     flexDirection: 'row',
@@ -357,6 +428,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     color: '#FF6B6B',
     fontWeight: '600',
+    fontSize: 14,
   },
   listContent: {
     padding: 15,
@@ -484,17 +556,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unitSelector: {
-    flexDirection: 'row',
     flex: 0.55,
-    justifyContent: 'space-between',
+  },
+  unitSelectorContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 10,
   },
   unitPill: {
     backgroundColor: '#f0f0f0',
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    minWidth: 40,
+    minWidth: 50,
     alignItems: 'center',
+    marginRight: 5,
   },
   unitPillActive: {
     backgroundColor: '#4A90E2',
