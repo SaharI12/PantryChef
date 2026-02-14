@@ -39,7 +39,8 @@ interface InventoryItem {
 }
 
 // --- Constants ---
-const CATEGORIES = ['Pantry', 'FruitVeg', 'Freezer', 'Refrigerator'];
+const CATEGORIES = ['Pantry', 'Fruit', 'Vegetables', 'Freezer', 'Refrigerator', 'Cleaning Supply', 'Bathroom'];
+const CATEGORIES_WITHOUT_EXPIRY = ['Cleaning Supply', 'Bathroom']; // Categories that don't need expiration dates
 const UNITS = ['units', 'kg', 'g', 'L'];
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -132,7 +133,7 @@ export default function Index() {
       category: formCategory,
       quantity: parseFloat(formQuantity) || 1,
       unit: formUnit,
-      expiration_date: formDate ? Timestamp.fromDate(formDate) : null,
+      expiration_date: CATEGORIES_WITHOUT_EXPIRY.includes(formCategory) ? null : (formDate ? Timestamp.fromDate(formDate) : null),
     };
 
     try {
@@ -410,7 +411,12 @@ export default function Index() {
                 value={formQuantity}
                 onChangeText={setFormQuantity}
                 />
-                <View style={styles.unitSelector}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.unitSelector}
+                    contentContainerStyle={styles.unitSelectorContent}
+                >
                     {UNITS.map((u) => (
                         <TouchableOpacity
                             key={u}
@@ -420,11 +426,16 @@ export default function Index() {
                             <Text style={[styles.unitText, formUnit === u && styles.unitTextActive]}>{u}</Text>
                         </TouchableOpacity>
                     ))}
-                </View>
+                </ScrollView>
             </View>
 
             <Text style={styles.label}>Category</Text>
-            <View style={styles.categoryRow}>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryScrollView}
+                contentContainerStyle={styles.categoryRow}
+            >
                 {CATEGORIES.map((cat) => (
                     <TouchableOpacity
                         key={cat}
@@ -436,63 +447,67 @@ export default function Index() {
                         </Text>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </ScrollView>
 
-            <Text style={styles.label}>Expiration Date</Text>
-            {Platform.OS === 'web' ? (
-              // Web: Use native HTML5 date input (has built-in calendar icon)
-              <View style={styles.input}>
-                <input
-                  type="date"
-                  value={formDate ? formDate.toISOString().split('T')[0] : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setFormDate(new Date(e.target.value));
-                    }
-                  }}
-                  placeholder="Select Date (Optional)"
-                  style={{
-                    border: 'none',
-                    outline: 'none',
-                    backgroundColor: 'transparent',
-                    fontSize: 16,
-                    width: '100%',
-                    color: formDate ? '#000' : '#aaa',
-                  }}
-                />
-              </View>
-            ) : (
-              // Mobile: Use DateTimePicker
+            {!CATEGORIES_WITHOUT_EXPIRY.includes(formCategory) && (
               <>
-                <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={{ color: formDate ? '#000' : '#aaa', fontSize: 16 }}>
-                    {formDate ? formDate.toLocaleDateString() : 'Select Date (Optional)'}
-                  </Text>
-                  <AntDesign name="calendar" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 12 }}/>
-                </TouchableOpacity>
-
-                {showDatePicker && (
-                  <View style={styles.datePickerContainer}>
-                    <DateTimePicker
-                      value={formDate || new Date()}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={onDateChange}
-                      themeVariant="light"
-                      textColor="black"
+                <Text style={styles.label}>Expiration Date</Text>
+                {Platform.OS === 'web' ? (
+                  // Web: Use native HTML5 date input (has built-in calendar icon)
+                  <View style={styles.input}>
+                    <input
+                      type="date"
+                      value={formDate ? formDate.toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setFormDate(new Date(e.target.value));
+                        }
+                      }}
+                      placeholder="Select Date (Optional)"
+                      style={{
+                        border: 'none',
+                        outline: 'none',
+                        backgroundColor: 'transparent',
+                        fontSize: 16,
+                        width: '100%',
+                        color: formDate ? '#000' : '#aaa',
+                      }}
                     />
-                    {Platform.OS === 'ios' && (
-                      <TouchableOpacity
-                        style={styles.iosDatePickerButton}
-                        onPress={() => setShowDatePicker(false)}
-                      >
-                        <Text style={styles.iosDatePickerButtonText}>Done</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
+                ) : (
+                  // Mobile: Use DateTimePicker
+                  <>
+                    <TouchableOpacity
+                      style={styles.input}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <Text style={{ color: formDate ? '#000' : '#aaa', fontSize: 16 }}>
+                        {formDate ? formDate.toLocaleDateString() : 'Select Date (Optional)'}
+                      </Text>
+                      <AntDesign name="calendar" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 12 }}/>
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                      <View style={styles.datePickerContainer}>
+                        <DateTimePicker
+                          value={formDate || new Date()}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={onDateChange}
+                          themeVariant="light"
+                          textColor="black"
+                        />
+                        {Platform.OS === 'ios' && (
+                          <TouchableOpacity
+                            style={styles.iosDatePickerButton}
+                            onPress={() => setShowDatePicker(false)}
+                          >
+                            <Text style={styles.iosDatePickerButtonText}>Done</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -778,17 +793,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unitSelector: {
-    flexDirection: 'row',
     flex: 0.55,
-    justifyContent: 'space-between',
+  },
+  unitSelectorContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 10,
   },
   unitPill: {
     backgroundColor: '#f0f0f0',
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    minWidth: 40,
+    minWidth: 50,
     alignItems: 'center',
+    marginRight: 5,
   },
   unitPillActive: {
     backgroundColor: '#4A90E2',
@@ -801,18 +820,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  categoryScrollView: {
+    maxHeight: 100,
+  },
   categoryRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     marginTop: 5,
+    paddingBottom: 10,
   },
   catPill: {
     backgroundColor: '#f0f0f0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 15,
     marginRight: 8,
-    marginBottom: 8,
   },
   catPillActive: {
     backgroundColor: '#4A90E2',
