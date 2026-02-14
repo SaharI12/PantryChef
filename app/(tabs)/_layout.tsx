@@ -20,14 +20,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Pantry',
+          title: 'House',
           tabBarIcon: ({ color }) => (
-            <MaterialIcons name="kitchen" size={28} color={color} />
+            <MaterialIcons name="home" size={28} color={color} />
           ),
         }}
       />
 
-      {/* Tab 2: Camera (New) */}
+      {/* Tab 2: Camera */}
       <Tabs.Screen
         name="camera"
         options={{
@@ -38,13 +38,24 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Tab 3: Recipes (New) */}
+      {/* Tab 3: Recipes */}
       <Tabs.Screen
         name="recipes"
         options={{
           title: 'Chef',
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="chef-hat" size={28} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 4: Shopping List */}
+      <Tabs.Screen
+        name="shopping-list"
+        options={{
+          title: 'Shopping',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="shopping-cart" size={28} color={color} />
           ),
         }}
       />

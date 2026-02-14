@@ -235,10 +235,28 @@ export default function Index() {
     }));
   };
 
+  const addToShoppingList = async (itemName: string, quantity: number, unit: string) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, `users/${user.uid}/shopping_list`), {
+        name: itemName,
+        quantity: quantity,
+        unit: unit,
+        checked: false,
+        created_at: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Error adding to shopping list:', error);
+    }
+  };
+
   const handleSaveUsage = async () => {
     if (!user) return;
 
     try {
+      // Track items that will be depleted
+      const depletedItems: { name: string; quantity: number; unit: string }[] = [];
+
       // Update all items with usage
       const updatePromises = Object.entries(usageItems)
         .filter(([_, amount]) => amount > 0)
@@ -249,6 +267,12 @@ export default function Index() {
           const newQuantity = item.quantity - usedAmount;
 
           if (newQuantity <= 0) {
+            // Track depleted items
+            depletedItems.push({
+              name: item.name,
+              quantity: Math.abs(newQuantity) + usedAmount,
+              unit: item.unit
+            });
             // Delete item if quantity is 0 or negative
             await deleteDoc(doc(db, `users/${user.uid}/inventory`, itemId));
           } else {
@@ -261,7 +285,37 @@ export default function Index() {
 
       await Promise.all(updatePromises);
       setUsageModalVisible(false);
-      Alert.alert('Success', 'Inventory updated!');
+
+      // Ask user if they want to add depleted items to shopping list
+      if (depletedItems.length > 0) {
+        const itemNames = depletedItems.map(item => item.name).join(', ');
+        Alert.alert(
+          'Add to Shopping List?',
+          `You've used up: ${itemNames}\n\nWould you like to add ${depletedItems.length === 1 ? 'it' : 'them'} to your shopping list?`,
+          [
+            {
+              text: 'No',
+              style: 'cancel',
+            },
+            {
+              text: 'Yes',
+              onPress: async () => {
+                try {
+                  for (const item of depletedItems) {
+                    await addToShoppingList(item.name, item.quantity, item.unit);
+                  }
+                  Alert.alert('Success', 'Items added to shopping list!');
+                } catch (error) {
+                  console.error('Error adding to shopping list:', error);
+                  Alert.alert('Error', 'Could not add items to shopping list.');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Success', 'Inventory updated!');
+      }
     } catch (error) {
       console.error('Error updating usage:', error);
       Alert.alert('Error', 'Could not update inventory.');
@@ -336,7 +390,7 @@ export default function Index() {
     <View style={styles.container}>
       {/* --- NEW HEADER ROW --- */}
       <View style={styles.topBar}>
-        <Text style={styles.appTitle}>PantryChef</Text>
+        <Text style={styles.appTitle}>House Inventory</Text>
         <View style={styles.topBarActions}>
           <TouchableOpacity onPress={openUsageModal} style={styles.usageButton}>
             <MaterialIcons name="remove-circle-outline" size={24} color="#4A90E2" />
