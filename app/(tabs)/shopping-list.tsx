@@ -56,26 +56,42 @@ export default function ShoppingList() {
 
   // --- Firestore Logic ---
   useEffect(() => {
-    if (!user) return;
-    const q = collection(db, `users/${user.uid}/shopping_list`);
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedItems: ShoppingItem[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as ShoppingItem[];
-
-      // Sort: unchecked items first, then by creation date
-      const sorted = fetchedItems.sort((a, b) => {
-        if (a.checked !== b.checked) {
-          return a.checked ? 1 : -1;
-        }
-        return (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0);
-      });
-
-      setItems(sorted);
+    if (!user) {
       setLoading(false);
-    });
-    return () => unsubscribe();
+      return;
+    }
+
+    try {
+      const q = collection(db, `users/${user.uid}/shopping_list`);
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const fetchedItems: ShoppingItem[] = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as ShoppingItem[];
+
+          // Sort: unchecked items first, then by creation date
+          const sorted = fetchedItems.sort((a, b) => {
+            if (a.checked !== b.checked) {
+              return a.checked ? 1 : -1;
+            }
+            return (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0);
+          });
+
+          setItems(sorted);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Error fetching shopping list:', error);
+          setLoading(false);
+        }
+      );
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error setting up shopping list listener:', error);
+      setLoading(false);
+    }
   }, [user]);
 
   // --- Handlers ---
@@ -507,6 +523,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
+    zIndex: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
